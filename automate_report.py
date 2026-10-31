@@ -44,23 +44,43 @@ def download_vine_report(page, download_dir, target_date):
     page.wait_for_load_state("networkidle")
     print("Logged in successfully.")
     
-    # 2. Click Reports icon on left sidebar (Book Icon - 8th menu item down)
-    print("Opening Reports menu...")
-    page.wait_for_timeout(3000)
+    # 2. Wait for dashboard and open Reports menu (Book Icon on left vertical bar)
+    print("Opening Reports sidebar menu...")
+    page.wait_for_timeout(5000)
     
-    # Use exact visual locator matching "Reports" icon/tooltip or left dark panel item
-    reports_icon = page.locator("a:has-text('Reports'), [title='Reports'], i.fa-book, .left-side div, .sidebar div").filter(has_text="Reports").first
-    if not reports_icon.is_visible():
-        # Fallback to clicking the 8th icon link in the left dark sidebar navigation bar
-        reports_icon = page.locator("nav a, div.sidebar a, ul.nav a").nth(7)
+    # Try multiple click strategies for the dark left sidebar Reports icon
+    sidebar_clicked = False
+    selectors_to_try = [
+        "i.fa-book",
+        ".fa-book",
+        "[title='Reports']",
+        "li:has(i.fa-book)",
+        "ul li:last-child",
+        "div:has-text('Reports')"
+    ]
     
-    reports_icon.click()
+    for selector in selectors_to_try:
+        try:
+            elem = page.locator(selector).first
+            if elem.is_visible():
+                elem.click(timeout=5000)
+                sidebar_clicked = True
+                print(f"Clicked sidebar using selector: {selector}")
+                break
+        except Exception:
+            continue
+            
+    if not sidebar_clicked:
+        # Fallback force click at the position of the 8th icon (Reports icon location)
+        page.mouse.click(20, 420)
+        print("Fallback clicked left sidebar by coordinate position.")
+
     page.wait_for_timeout(2000)
     
     # 3. Click "MIS Report 2.0"
     print("Selecting MIS Report 2.0...")
-    mis_report_link = page.locator("text=MIS Report 2.0").first
-    mis_report_link.click()
+    mis_report = page.locator("text=MIS Report 2.0").first
+    mis_report.click(timeout=10000)
     page.wait_for_load_state("networkidle")
     page.wait_for_timeout(3000)
 
@@ -132,8 +152,8 @@ def main():
     os.makedirs(download_dir, exist_ok=True)
 
     with sync_playwright() as p:
-        browser = p.chromium.launch(headless=True)
-        context = browser.new_context(accept_downloads=True)
+        browser = p.chromium.launch(headless=True, args=["--start-maximized"])
+        context = browser.new_context(viewport={"width": 1920, "height": 1080}, accept_downloads=True)
         page = context.new_page()
 
         for d in target_dates:
