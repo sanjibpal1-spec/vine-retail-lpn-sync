@@ -9,7 +9,6 @@ from playwright.sync_api import sync_playwright
 WEBHOOK_URL = os.environ["GSHEET_WEBHOOK_URL"]
 
 def upload_to_gsheet(df):
-    # Convert DataFrame to a list of lists (Headers + Data)
     data_payload = [df.columns.values.tolist()] + df.fillna("").values.tolist()
     
     response = requests.post(
@@ -31,35 +30,55 @@ def get_target_dates():
         return [today_str]
 
 def download_vine_report(page, download_dir, target_date):
-    page.goto("https://multistorewh.vineretail.com/eRetailWeb/eRetailLogin")
-    page.fill("#username", os.environ["VINE_USER"])
-    page.fill("#password", os.environ["VINE_PASS"])
-    page.click("button:has-text('Login')")
+    print(f"Navigating to login page for date: {target_date}")
+    page.goto("https://multistorewh.vineretail.com/eRetailWeb/eRetailLogin", wait_until="networkidle")
     
+    # Fill login credentials
+    page.fill("input[name='username'], #username", os.environ["VINE_USER"])
+    page.fill("input[name='password'], #password", os.environ["VINE_PASS"])
+    
+    # Click Submit/Login button (handles input submit, button, or class selectors)
+    login_selector = "input[type='submit'], input[value='Login'], button[type='submit'], #loginBtn, .btn-primary"
+    page.click(login_selector)
+    page.wait_for_load_state("networkidle")
+    print("Logged in successfully.")
+    
+    # Open MIS Report 2.0
     page.click("text=Reports")
+    page.wait_for_selector("text=MIS Report 2.0", state="visible")
     page.click("text=MIS Report 2.0")
+    page.wait_for_load_state("networkidle")
     
+    # Select Dropdowns
     page.select_option("select[name='reportGroup']", label="Sales")
     page.select_option("select[name='reportName']", label="PICK IPP Report")
     
-    page.fill("input[name='dateRange']", f"{target_date} - {target_date}")
+    # Fill Date Range
+    date_input = page.locator("input[name='dateRange'], #dateRange")
+    date_input.fill(f"{target_date} - {target_date}")
     
-    page.click(".select2-selection")
-    page.click("li:has-text('JCT-CBE IM1 Temp')")
+    # Select Location "JCT-CBE IM1 Temp"
+    page.click(".select2-selection, select[name='location']")
+    location_option = page.locator("li:has-text('JCT-CBE IM1 Temp'), option:has-text('JCT-CBE IM1 Temp')")
+    location_option.click()
     
-    page.click("button:has-text('Export')")
+    # Click Export
+    page.click("button:has-text('Export'), input[value='Export'], .btn-warning")
     
-    print(f"Waiting 3 minutes for report ({target_date})...")
+    print(f"Waiting 3 minutes for report ({target_date}) to generate...")
     time.sleep(180)
     
-    page.click("img[title='Refresh'], .blue-refresh-icon")
+    # Refresh Pending Report Tab
+    page.click("img[title='Refresh'], .blue-refresh-icon, a:has-text('Refresh')")
     time.sleep(5)
     
+    # Download File
     with page.expect_download() as download_info:
-        page.click("img[src*='download'], .download-icon")
+        page.click("img[src*='download'], .download-icon, a[title='Download']")
     download = download_info.value
     filepath = os.path.join(download_dir, f"report_{target_date.replace('/', '_')}.xlsx")
     download.save_as(filepath)
+    print(f"File downloaded successfully to {filepath}")
     return filepath
 
 def main():
