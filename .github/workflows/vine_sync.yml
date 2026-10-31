@@ -20,13 +20,12 @@ jobs:
 
     - name: Install Dependencies & Playwright
       run: |
-        pip install pandas openpyxl gspread oauth2client playwright
+        pip install pandas openpyxl requests playwright
         playwright install chromium
 
     - name: Execute Script
       env:
         VINE_USER: ${{ secrets.VINE_USER }}
         VINE_PASS: ${{ secrets.VINE_PASS }}
-        SPREADSHEET_ID: ${{ secrets.SPREADSHEET_ID }}
-        GCP_SERVICE_ACCOUNT_KEY: ${{ secrets.GCP_SERVICE_ACCOUNT_KEY }}
+        GSHEET_WEBHOOK_URL: ${{ secrets.GSHEET_WEBHOOK_URL }}
       run: python automate_report.py
