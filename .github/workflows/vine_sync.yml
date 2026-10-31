@@ -1,0 +1,32 @@
+name: Vine Retail Auto Sync to Google Sheets
+
+on:
+  schedule:
+    - cron: '*/15 * * * *'  # Runs automatically every 15 minutes
+  workflow_dispatch:        # Allows manual run from GitHub UI
+
+jobs:
+  run-sync:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.10'
+
+    - name: Install Dependencies & Playwright
+      run: |
+        pip install pandas openpyxl gspread oauth2client playwright
+        playwright install chromium
+
+    - name: Execute Script
+      env:
+        VINE_USER: ${{ secrets.VINE_USER }}
+        VINE_PASS: ${{ secrets.VINE_PASS }}
+        SPREADSHEET_ID: ${{ secrets.SPREADSHEET_ID }}
+        GCP_SERVICE_ACCOUNT_KEY: ${{ secrets.GCP_SERVICE_ACCOUNT_KEY }}
+      run: python automate_report.py
