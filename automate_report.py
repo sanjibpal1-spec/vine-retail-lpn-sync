@@ -44,17 +44,22 @@ def download_vine_report(page, download_dir, target_date):
     page.wait_for_load_state("networkidle")
     print("Logged in successfully.")
     
-    # 2. Open Reports menu
+    # 2. Click Reports icon on left sidebar (Book Icon - 8th menu item down)
     print("Opening Reports menu...")
-    sidebar_icon = page.locator(".sidebar-menu i.fa-book, a[title='Reports'], li.treeview:has-text('Reports')").first
-    if not sidebar_icon.is_visible():
-        sidebar_icon = page.locator(".sidebar-menu li").last
-    sidebar_icon.click()
+    page.wait_for_timeout(3000)
+    
+    # Use exact visual locator matching "Reports" icon/tooltip or left dark panel item
+    reports_icon = page.locator("a:has-text('Reports'), [title='Reports'], i.fa-book, .left-side div, .sidebar div").filter(has_text="Reports").first
+    if not reports_icon.is_visible():
+        # Fallback to clicking the 8th icon link in the left dark sidebar navigation bar
+        reports_icon = page.locator("nav a, div.sidebar a, ul.nav a").nth(7)
+    
+    reports_icon.click()
     page.wait_for_timeout(2000)
     
-    # 3. Open MIS Report 2.0
+    # 3. Click "MIS Report 2.0"
     print("Selecting MIS Report 2.0...")
-    mis_report_link = page.locator("a:has-text('MIS Report 2.0'), td:has-text('MIS Report 2.0')").first
+    mis_report_link = page.locator("text=MIS Report 2.0").first
     mis_report_link.click()
     page.wait_for_load_state("networkidle")
     page.wait_for_timeout(3000)
@@ -67,7 +72,7 @@ def download_vine_report(page, download_dir, target_date):
                 report_container = frame
                 break
     
-    # 4. Target VISIBLE dropdown selects only (bypasses #reportIdHdn)
+    # 4. Target VISIBLE dropdown selects only
     print("Setting report filters...")
     visible_selects = report_container.locator("select:visible")
     
@@ -83,7 +88,7 @@ def download_vine_report(page, download_dir, target_date):
     date_input = report_container.locator("input:visible[type='text']").first
     date_input.fill(f"{target_date} - {target_date}")
     
-    # 6. Select Location "JCT-CBE IM1 Temp" via Select2 widget
+    # 6. Select Location "JCT-CBE IM1 Temp"
     print("Selecting location JCT-CBE IM1 Temp...")
     select2_box = report_container.locator(".select2-selection, .select2-choices").first
     select2_box.click()
