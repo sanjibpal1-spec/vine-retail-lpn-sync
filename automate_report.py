@@ -35,7 +35,7 @@ def download_vine_report(page, download_dir, target_date):
     print(f"Navigating to login page for target date: {target_date}")
     page.goto("https://multistorewh.vineretail.com/eRetailWeb/eRetailLogin", wait_until="networkidle")
     
-    # 1. Fill login credentials
+    # 1. Login
     page.fill("input[name='username'], #username", os.environ["VINE_USER"])
     page.fill("input[name='password'], #password", os.environ["VINE_PASS"])
     
@@ -44,23 +44,22 @@ def download_vine_report(page, download_dir, target_date):
     page.wait_for_load_state("networkidle")
     print("Logged in successfully.")
     
-    # 2. Click the Reports icon on the left-hand dark sidebar (book icon / bottom icon)
-    print("Opening Reports sidebar menu...")
+    # 2. Open Reports menu
+    print("Opening Reports menu...")
     sidebar_icon = page.locator(".sidebar-menu i.fa-book, a[title='Reports'], li.treeview:has-text('Reports')").first
     if not sidebar_icon.is_visible():
-        # Fallback to last icon on dark vertical sidebar
         sidebar_icon = page.locator(".sidebar-menu li").last
     sidebar_icon.click()
     page.wait_for_timeout(2000)
     
-    # 3. Click "MIS Report 2.0" under Miscellaneous category
+    # 3. Open MIS Report 2.0
     print("Selecting MIS Report 2.0...")
     mis_report_link = page.locator("a:has-text('MIS Report 2.0'), td:has-text('MIS Report 2.0')").first
     mis_report_link.click()
     page.wait_for_load_state("networkidle")
     page.wait_for_timeout(3000)
 
-    # If Vine Retail uses an iFrame for reports, get frame; otherwise use main page
+    # Resolve active frame/page context
     report_container = page
     if len(page.frames) > 1:
         for frame in page.frames:
@@ -68,45 +67,49 @@ def download_vine_report(page, download_dir, target_date):
                 report_container = frame
                 break
     
-    # 4. Select Dropdowns (Report Group = Sales & Report Name = PICK IPP Report)
+    # 4. Target VISIBLE dropdown selects only (bypasses #reportIdHdn)
     print("Setting report filters...")
-    report_group = report_container.locator("select").first
-    report_group.select_option(label="Sales")
+    visible_selects = report_container.locator("select:visible")
+    
+    # Select Report Group = "Sales"
+    visible_selects.nth(0).select_option(label="Sales")
     page.wait_for_timeout(1000)
 
-    report_name = report_container.locator("select").nth(1)
-    report_name.select_option(label="PICK IPP Report")
+    # Select Report Name = "PICK IPP Report"
+    visible_selects.nth(1).select_option(label="PICK IPP Report")
     page.wait_for_timeout(1000)
     
     # 5. Fill Date Range (Format: DD/MM/YYYY - DD/MM/YYYY)
-    date_input = report_container.locator("input[type='text']").first
+    date_input = report_container.locator("input:visible[type='text']").first
     date_input.fill(f"{target_date} - {target_date}")
     
-    # 6. Select Location "JCT-CBE IM1 Temp"
-    loc_container = report_container.locator(".select2-selection, select").last
-    loc_container.click()
+    # 6. Select Location "JCT-CBE IM1 Temp" via Select2 widget
+    print("Selecting location JCT-CBE IM1 Temp...")
+    select2_box = report_container.locator(".select2-selection, .select2-choices").first
+    select2_box.click()
     page.wait_for_selector("li:has-text('JCT-CBE IM1 Temp')", state="visible")
     page.click("li:has-text('JCT-CBE IM1 Temp')")
     
     # 7. Click Export
     print("Clicking Export...")
-    export_btn = report_container.locator("button:has-text('Export'), a:has-text('Export'), input[value='Export']").first
+    export_btn = report_container.locator("button:has-text('Export'), .btn-warning, input[value='Export']").first
     export_btn.click()
     page.wait_for_load_state("networkidle")
     
     print(f"Export requested. Waiting 3 minutes for report ({target_date}) to generate...")
     time.sleep(180)
     
-    # 8. Refresh Pending Report Tab
-    refresh_icon = page.locator("img[title*='Refresh'], .fa-sync, .fa-refresh, #pull_refresh, a.refresh_btn").first
+    # 8. Refresh Pending Report tab
+    print("Refreshing Pending Report screen...")
+    refresh_icon = page.locator("img[src*='refresh'], .fa-sync, .fa-refresh, #pull_refresh, a.refresh_btn").first
     if refresh_icon.is_visible():
         refresh_icon.click()
     else:
         page.reload()
     time.sleep(5)
     
-    # 9. Download File
-    print("Downloading generated Excel file...")
+    # 9. Download file
+    print("Downloading Excel file...")
     with page.expect_download(timeout=60000) as download_info:
         page.click("img[src*='download'], img[src*='db'], a[title='Download'], .fa-download")
     
@@ -131,7 +134,7 @@ def main():
         for d in target_dates:
             file_path = download_vine_report(page, download_dir, d)
             
-            # Read Excel starting from Row 11 (Header is at row 11 -> header=10)
+            # Read Excel starting from Row 11 (Header is row 11 -> header=10)
             df = pd.read_excel(file_path, header=10)
             
             # Filter Column G (Order_Type) for "PREPAID"
